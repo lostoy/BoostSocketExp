@@ -1,4 +1,5 @@
-#include "pcl_socket.cpp"
+#include "SocketServer.hpp"
+
 
 #include <boost/asio.hpp>
 
@@ -21,18 +22,38 @@
 class PointCloudStreamer
 {
 public:
-	PointCloudStreamer(pcl::Grabber &capture, bool enableServer = false, bool enableClient = false, bool enableVis = true) :capture_(capture), enableClient_(enableClient), enableServer_(enableServer), enableVis_(enableVis)
+	PointCloudStreamer(pcl::Grabber &capture, bool enableServer = true, bool enableClient = false, bool enableVis = true) :capture_(capture), enableClient_(enableClient), enableServer_(enableServer), enableVis_(enableVis)
 	{
 		if (enableVis_)
 			initVis();
+		if (enableServer_)
+			initServer();
 		
 	}
+	~PointCloudStreamer()
+	{
+		
+		if (enableServer_)
+		{
+			io_service_.stop();
+			socketThread_->join();
 
+		}
+
+	}
 	void initVis()
 	{
 		viewer_.setBackgroundColor(0,0,0);
 	}
 
+	void initServer()
+	{
+		
+		server_ =boost::shared_ptr<SocketServer>(new SocketServer(io_service_));
+		server_->start();
+		socketThread_ = boost::shared_ptr<boost::thread>(new boost::thread(boost::bind(&boost::asio::io_service::run,&io_service_)));
+		
+	}
 	void grabRGBAframe(const pcl::PointCloud<pcl::PointXYZRGBA>::ConstPtr &cloud)
 	{
 		boost::mutex::scoped_try_lock lock(data_ready);
@@ -57,14 +78,31 @@ public:
 				{
 					viewer_.removeAllPointClouds();
 					viewer_.addPointCloud(cloud_.makeShared());
+					if (enableServer_)
+					{
+						DispatchData();
+					}
 				}
 			
 				viewer_.spinOnce();
 			}
 	}
 private:
+
+	size_t DispatchData()
+	{
+		for (std::vector<SocketStreamer::SocketStreamerPtr>::iterator it = server_->socketList_.begin(); it != server_->socketList_.end(); it++)
+		{
+
+			//if (server_->socketList_[i])
+			SocketStreamer & itref = *(*it);
+			itref.sendData();
+		}
+		return server_->socketList_.size();
+
+	}
 	boost::asio::io_service io_service_;
-	SocketServer::SocketServerPtr server_;
+	SocketServerPtr server_;
 	SocketClient::SocketClientPtr client_;
 	pcl::Grabber& capture_;
 	pcl::visualization::PCLVisualizer viewer_;
@@ -75,6 +113,10 @@ private:
 	bool enableVis_;
 	boost::mutex data_ready;
 	boost::condition_variable data_ready_cond_;
+
+	boost::shared_ptr<boost::thread> socketThread_;
+
+	
 };
 int main()
 {
