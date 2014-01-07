@@ -17,6 +17,9 @@
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/visualization/image_viewer.h>
 
+#include <pcl/registration/gicp.h>
+#include <pcl/filters/approximate_voxel_grid.h>
+
 #include <opencv2/core/core.hpp>
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -120,12 +123,13 @@ public:
 					if (enableVis_)
 					{
 
-		//				cloud_viewer_.removeAllPointClouds();
-						/*viewer_.addPointCloud(cloud_.makeShared());*/
+						
 						//image_viewer_.showRGBImage(image_, width, height);
-						//cloud_viewer_.spinOnce(3);
+						cloud_viewer_.spinOnce(3);
 					}
-					fusion2World();
+					//fusion2World();
+					cloud_viewer_.removeAllPointClouds();
+					cloud_viewer_.addPointCloud(cloud_.makeShared());
 					if (enableServer_)
 					{
 						DispatchData();
@@ -154,6 +158,8 @@ private:
 
 	bool fusion2World()
 	{
+		if (pre_cloud_.empty())
+			return false;
 		cv::Mat pre_img_mat(height, width, CV_8UC3, pre_image_);//not transform from rgb2bgr
 		cv::Mat img_mat(height, width, CV_8UC3, image_);
 
@@ -161,29 +167,78 @@ private:
 		//cv::cvtColor(img_mat, img_mat, CV_RGB2BGR);
 		
 		std::vector<cv::KeyPoint> pre_keypoints,keypoints;
-		cv::Ptr<cv::FeatureDetector> fdect = cv::FeatureDetector::create("FAST");
+		/*cv::Ptr<cv::FeatureDetector> fdect = cv::FeatureDetector::create("FAST");
 		fdect->detect(pre_img_mat, pre_keypoints);
-		fdect->detect(img_mat, keypoints);
+		fdect->detect(img_mat, keypoints);*/
+
+		cv::SurfFeatureDetector detc(400);
+
+		detc.detect(img_mat, keypoints);
+		detc.detect(pre_img_mat, pre_keypoints);
+
 
 		cv::Mat pre_img_desc, img_desc;
-		cv::drawKeypoints(img_mat, keypoints, img_mat);
+
+		/*cv::drawKeypoints(img_mat, keypoints, img_mat);
 		cv::drawKeypoints(pre_img_mat, pre_keypoints, pre_img_mat);
 		imshow("pre_img", pre_img_mat);
 		imshow("img",img_mat);
-		cvWaitKey(60);
-		//cv::SurfDescriptorExtractor extractor;
-		//extractor.compute(pre_img_mat, pre_keypoints, pre_img_desc);
-		//extractor.compute(img_mat, keypoints, img_desc);
+		cvWaitKey(5);
+		*/
+		
+		cv::SurfDescriptorExtractor extractor;
+		extractor.compute(pre_img_mat, pre_keypoints, pre_img_desc);
+		extractor.compute(img_mat, keypoints, img_desc);
 
-		//std::vector<cv::DMatch> matches;
+		std::vector<cv::DMatch> matches;
 
-		//cv::FlannBasedMatcher matcher;
+		cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create("FlannBased");
+		matcher->match(pre_img_desc, img_desc, matches);
 
 
-		//matcher.match(pre_img_desc, img_desc, matches);
-		//std::sort(matches.begin(), matches.end());
+		
+		std::sort(matches.begin(), matches.end());
+		pcl::Correspondences corr;
+		pcl::PointCloud<pcl::PointXYZRGBA> pcl_keypoints, pcl_keypoints_pre;
+		int j = 0;
+		for (size_t i = 0; i < 32; i++)
+		{
+			int sid = matches[i].queryIdx;
+			int tid = matches[i].trainIdx;
+
+			int sind = int(pre_keypoints[sid].pt.y)*width + int(pre_keypoints[sid].pt.x);
+			int tind = int(keypoints[tid].pt.y)*width + int(keypoints[tid].pt.x);
+
+			
+			if (pcl_isfinite(cloud_.points[tind].x) && pcl_isfinite(pre_cloud_.points[sid].x))
+			{
+				pcl_keypoints.push_back(cloud_.points[tind]);
+				pcl_keypoints_pre.push_back(pre_cloud_.points[sid]);
+
+				pcl::Correspondence cori;
+				cori.index_query = j;
+				cori.index_match = j;
+				j++;
+				corr.push_back(cori);
+			}
+		}
+
+		Eigen::Matrix4f transform;
+
+		pcl::registration::TransformationEstimationSVD<pcl::PointXYZRGBA, pcl::PointXYZRGBA> est;
+
+
+
+		est.estimateRigidTransformation(pcl_keypoints, pcl_keypoints, corr, transform);
+
+		pcl::transformPointCloud(cloud_, cloud_, transform);
 		
 
+		//world_ += cloud_;
+		/*pcl::ApproximateVoxelGrid<pcl::PointXYZRGBA> avg;
+		avg.setInputCloud(world_.makeShared());
+		avg.setLeafSize(0.05, 0.05, 0.05);
+		avg.filter(cloud_);*/
 		
 		return true;
 	}
