@@ -116,20 +116,22 @@ public:
 		
 			while (!exit_&&!cloud_viewer_.wasStopped()&&!image_viewer_.wasStopped())
 			{
-				bool has_data = data_ready_cond_.timed_wait(lock, boost::posix_time::millisec(60));
+				bool has_data = data_ready_cond_.timed_wait(lock, boost::posix_time::millisec(4));
 				
 				if (has_data)
 				{
+					fusion2World();
 					if (enableVis_)
 					{
 
 						
 						//image_viewer_.showRGBImage(image_, width, height);
-						cloud_viewer_.spinOnce(3);
+						//cloud_viewer_.removeAllPointClouds();
+						//cloud_viewer_.addPointCloud(cloud_.makeShared());
+						//cloud_viewer_.spinOnce();
 					}
-					//fusion2World();
-					cloud_viewer_.removeAllPointClouds();
-					cloud_viewer_.addPointCloud(cloud_.makeShared());
+					
+					
 					if (enableServer_)
 					{
 						DispatchData();
@@ -160,6 +162,8 @@ private:
 	{
 		if (pre_cloud_.empty())
 			return false;
+		boost::posix_time::ptime t1(boost::posix_time::microsec_clock::local_time());
+
 		cv::Mat pre_img_mat(height, width, CV_8UC3, pre_image_);//not transform from rgb2bgr
 		cv::Mat img_mat(height, width, CV_8UC3, image_);
 
@@ -190,12 +194,18 @@ private:
 		extractor.compute(pre_img_mat, pre_keypoints, pre_img_desc);
 		extractor.compute(img_mat, keypoints, img_desc);
 
+		boost::posix_time::ptime t2(boost::posix_time::microsec_clock::local_time());
+		boost::posix_time::time_duration dt = t2 - t1;
+		std::cout << "extract a frame in: " << dt.total_milliseconds() / 1000.0 << std::endl;
+
 		std::vector<cv::DMatch> matches;
 
 		cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create("FlannBased");
 		matcher->match(pre_img_desc, img_desc, matches);
 
-
+		boost::posix_time::ptime t3(boost::posix_time::microsec_clock::local_time());
+		dt = t3 - t2;
+		std::cout << "match a frame in: " << dt.total_milliseconds() / 1000.0 << std::endl;
 		
 		std::sort(matches.begin(), matches.end());
 		pcl::Correspondences corr;
@@ -210,10 +220,10 @@ private:
 			int tind = int(keypoints[tid].pt.y)*width + int(keypoints[tid].pt.x);
 
 			
-			if (pcl_isfinite(cloud_.points[tind].x) && pcl_isfinite(pre_cloud_.points[sid].x))
+			if (pcl_isfinite(cloud_.points[tind].x) && pcl_isfinite(pre_cloud_.points[sind].x))
 			{
 				pcl_keypoints.push_back(cloud_.points[tind]);
-				pcl_keypoints_pre.push_back(pre_cloud_.points[sid]);
+				pcl_keypoints_pre.push_back(pre_cloud_.points[sind]);
 
 				pcl::Correspondence cori;
 				cori.index_query = j;
@@ -229,17 +239,21 @@ private:
 
 
 
-		est.estimateRigidTransformation(pcl_keypoints, pcl_keypoints, corr, transform);
+		est.estimateRigidTransformation(pcl_keypoints, pcl_keypoints_pre, corr, transform);
 
 		pcl::transformPointCloud(cloud_, cloud_, transform);
-		
-
+		/*image_viewer_.showCorrespondences(pcl_keypoints_pre, pcl_keypoints, corr);
+		image_viewer_.spinOnce();
+*/
 		//world_ += cloud_;
 		/*pcl::ApproximateVoxelGrid<pcl::PointXYZRGBA> avg;
 		avg.setInputCloud(world_.makeShared());
 		avg.setLeafSize(0.05, 0.05, 0.05);
 		avg.filter(cloud_);*/
-		
+		boost::posix_time::ptime t4(boost::posix_time::microsec_clock::local_time());
+		 dt = t4 - t3;
+		std::cout << "fusion a frame in: " << dt.total_milliseconds() / 1000.0 << std::endl; 
+
 		return true;
 	}
 	
