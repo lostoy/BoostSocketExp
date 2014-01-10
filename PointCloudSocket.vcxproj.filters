@@ -4,16 +4,13 @@
     <ClCompile Include="PointCloudSocket.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="SocketServer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="CMakeLists.txt" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Source Files">
-      <UniqueIdentifier>{36F0002E-F7A5-4F47-8033-3B78356B8F56}</UniqueIdentifier>
+      <UniqueIdentifier>{E677ED33-350B-4F7B-9D06-E1E62EC8044A}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

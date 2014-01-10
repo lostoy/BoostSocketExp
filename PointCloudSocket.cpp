@@ -25,6 +25,8 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/nonfree/nonfree.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/gpu/gpu.hpp>
+#include <opencv2/nonfree/gpu.hpp>
 
 #include <iostream>
 #include <string>
@@ -116,7 +118,7 @@ public:
 		
 			while (!exit_&&!cloud_viewer_.wasStopped()&&!image_viewer_.wasStopped())
 			{
-				bool has_data = data_ready_cond_.timed_wait(lock, boost::posix_time::millisec(4));
+				bool has_data = data_ready_cond_.timed_wait(lock, boost::posix_time::millisec(60));
 				
 				if (has_data)
 				{
@@ -126,9 +128,9 @@ public:
 
 						
 						//image_viewer_.showRGBImage(image_, width, height);
-						//cloud_viewer_.removeAllPointClouds();
-						//cloud_viewer_.addPointCloud(cloud_.makeShared());
-						//cloud_viewer_.spinOnce();
+						cloud_viewer_.removeAllPointClouds();
+						cloud_viewer_.addPointCloud(cloud_.makeShared());
+						cloud_viewer_.spinOnce(10);
 					}
 					
 					
@@ -162,98 +164,184 @@ private:
 	{
 		if (pre_cloud_.empty())
 			return false;
-		boost::posix_time::ptime t1(boost::posix_time::microsec_clock::local_time());
-
+//		boost::posix_time::ptime t1(boost::posix_time::microsec_clock::local_time());
+//
 		cv::Mat pre_img_mat(height, width, CV_8UC3, pre_image_);//not transform from rgb2bgr
 		cv::Mat img_mat(height, width, CV_8UC3, image_);
+//
+//		//cv::cvtColor(pre_img_mat, pre_img_mat, CV_RGB2BGR);
+//		//cv::cvtColor(img_mat, img_mat, CV_RGB2BGR);
+//		
+//		std::vector<cv::KeyPoint> pre_keypoints,keypoints;
+//		/*cv::Ptr<cv::FeatureDetector> fdect = cv::FeatureDetector::create("FAST");
+//		fdect->detect(pre_img_mat, pre_keypoints);
+//		fdect->detect(img_mat, keypoints);*/
+//
+//		cv::SurfFeatureDetector detc(400);
+//
+//		detc.detect(img_mat, keypoints);
+//		detc.detect(pre_img_mat, pre_keypoints);
+//
+//
+//		cv::Mat pre_img_desc, img_desc;
+//
+//		/*cv::drawKeypoints(img_mat, keypoints, img_mat);
+//		cv::drawKeypoints(pre_img_mat, pre_keypoints, pre_img_mat);
+//		imshow("pre_img", pre_img_mat);
+//		imshow("img",img_mat);
+//		cvWaitKey(5);
+//		*/
+//		
+//		cv::SurfDescriptorExtractor extractor;
+//		extractor.compute(pre_img_mat, pre_keypoints, pre_img_desc);
+//		extractor.compute(img_mat, keypoints, img_desc);
+//
+//		boost::posix_time::ptime t2(boost::posix_time::microsec_clock::local_time());
+//		boost::posix_time::time_duration dt = t2 - t1;
+//		std::cout << "extract a frame in: " << dt.total_milliseconds() / 1000.0 << std::endl;
+//
+//		std::vector<cv::DMatch> matches;
+//
+//		cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create("FlannBased");
+//		matcher->match(pre_img_desc, img_desc, matches);
+//
+//		boost::posix_time::ptime t3(boost::posix_time::microsec_clock::local_time());
+//		dt = t3 - t2;
+//		std::cout << "match a frame in: " << dt.total_milliseconds() / 1000.0 << std::endl;
+//		
+//		std::sort(matches.begin(), matches.end());
+//		pcl::Correspondences corr;
+//		pcl::PointCloud<pcl::PointXYZRGBA> pcl_keypoints, pcl_keypoints_pre;
+//		int j = 0;
+//		for (size_t i = 0; i < 32; i++)
+//		{
+//			int sid = matches[i].queryIdx;
+//			int tid = matches[i].trainIdx;
+//
+//			int sind = int(pre_keypoints[sid].pt.y)*width + int(pre_keypoints[sid].pt.x);
+//			int tind = int(keypoints[tid].pt.y)*width + int(keypoints[tid].pt.x);
+//
+//			
+//			if (pcl_isfinite(cloud_.points[tind].x) && pcl_isfinite(pre_cloud_.points[sind].x))
+//			{
+//				pcl_keypoints.push_back(cloud_.points[tind]);
+//				pcl_keypoints_pre.push_back(pre_cloud_.points[sind]);
+//
+//				pcl::Correspondence cori;
+//				cori.index_query = j;
+//				cori.index_match = j;
+//				j++;
+//				corr.push_back(cori);
+//			}
+//		}
+//
+//		Eigen::Matrix4f transform;
+//
+//		pcl::registration::TransformationEstimationSVD<pcl::PointXYZRGBA, pcl::PointXYZRGBA> est;
+//
+//
+//
+//		est.estimateRigidTransformation(pcl_keypoints, pcl_keypoints_pre, corr, transform);
+//
+//		pcl::transformPointCloud(cloud_, cloud_, transform);
+//		/*image_viewer_.showCorrespondences(pcl_keypoints_pre, pcl_keypoints, corr);
+//		image_viewer_.spinOnce();
+//*/
+//		//world_ += cloud_;
+//		/*pcl::ApproximateVoxelGrid<pcl::PointXYZRGBA> avg;
+//		avg.setInputCloud(world_.makeShared());
+//		avg.setLeafSize(0.05, 0.05, 0.05);
+//		avg.filter(cloud_);*/
+//		boost::posix_time::ptime t4(boost::posix_time::microsec_clock::local_time());
+//		 dt = t4 - t3;
+//		std::cout << "fusion a frame in: " << dt.total_milliseconds() / 1000.0 << std::endl; 
+		boost::posix_time::ptime t1(boost::posix_time::microsec_clock::local_time());
+		cv::gpu::GpuMat img_gpu_mat, img_gpu_mat_pre;
 
-		//cv::cvtColor(pre_img_mat, pre_img_mat, CV_RGB2BGR);
-		//cv::cvtColor(img_mat, img_mat, CV_RGB2BGR);
-		
-		std::vector<cv::KeyPoint> pre_keypoints,keypoints;
-		/*cv::Ptr<cv::FeatureDetector> fdect = cv::FeatureDetector::create("FAST");
-		fdect->detect(pre_img_mat, pre_keypoints);
-		fdect->detect(img_mat, keypoints);*/
+		cv::cvtColor(pre_img_mat, pre_img_mat, CV_RGB2GRAY);
+		cv::cvtColor(img_mat, img_mat, CV_RGB2GRAY);
+		img_gpu_mat.upload(img_mat);
+		img_gpu_mat_pre.upload(pre_img_mat);
 
-		cv::SurfFeatureDetector detc(400);
+		//cv::gpu::printShortCudaDeviceInfo(cv::gpu::getDevice());
 
-		detc.detect(img_mat, keypoints);
-		detc.detect(pre_img_mat, pre_keypoints);
+		cv::gpu::SURF_GPU surf;
 
+		cv::gpu::GpuMat keypoints_gpu, keypoints_gpu_pre;
+		cv::gpu::GpuMat img_desc_gpu, img_desc_gpu_pre;
 
-		cv::Mat pre_img_desc, img_desc;
+		surf(img_gpu_mat, cv::gpu::GpuMat(), keypoints_gpu, img_desc_gpu);
+		surf(img_gpu_mat_pre, cv::gpu::GpuMat(), keypoints_gpu_pre, img_desc_gpu_pre);
 
-		/*cv::drawKeypoints(img_mat, keypoints, img_mat);
-		cv::drawKeypoints(pre_img_mat, pre_keypoints, pre_img_mat);
-		imshow("pre_img", pre_img_mat);
-		imshow("img",img_mat);
-		cvWaitKey(5);
-		*/
-		
-		cv::SurfDescriptorExtractor extractor;
-		extractor.compute(pre_img_mat, pre_keypoints, pre_img_desc);
-		extractor.compute(img_mat, keypoints, img_desc);
+		cv::gpu::BFMatcher_GPU matcher_gpu(cv::NORM_L2);
 
-		boost::posix_time::ptime t2(boost::posix_time::microsec_clock::local_time());
-		boost::posix_time::time_duration dt = t2 - t1;
-		std::cout << "extract a frame in: " << dt.total_milliseconds() / 1000.0 << std::endl;
+		cv::gpu::GpuMat trainIdx, distance;
+		matcher_gpu.matchSingle(img_desc_gpu_pre,img_desc_gpu, trainIdx, distance);
+
+		std::vector<cv::KeyPoint> keypoints, keypoints_pre;
+		std::vector<float>img_desc, img_desc_pre;
 
 		std::vector<cv::DMatch> matches;
 
-		cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create("FlannBased");
-		matcher->match(pre_img_desc, img_desc, matches);
+		surf.downloadKeypoints(keypoints_gpu, keypoints);
+		surf.downloadKeypoints(keypoints_gpu_pre, keypoints_pre);
 
-		boost::posix_time::ptime t3(boost::posix_time::microsec_clock::local_time());
-		dt = t3 - t2;
-		std::cout << "match a frame in: " << dt.total_milliseconds() / 1000.0 << std::endl;
-		
+		surf.downloadDescriptors(img_desc_gpu, img_desc);
+		surf.downloadDescriptors(img_desc_gpu_pre, img_desc_pre);
+
+		cv::gpu::BFMatcher_GPU::matchDownload(trainIdx, distance, matches);
+
+		boost::posix_time::ptime t2(boost::posix_time::microsec_clock::local_time());
+		boost::posix_time::time_duration dt = t2 - t1;
+		std::cout << "[1]match a frame in: " << dt.total_milliseconds() / 1000.0 << std::endl;
+
 		std::sort(matches.begin(), matches.end());
-		pcl::Correspondences corr;
-		pcl::PointCloud<pcl::PointXYZRGBA> pcl_keypoints, pcl_keypoints_pre;
-		int j = 0;
-		for (size_t i = 0; i < 32; i++)
-		{
-			int sid = matches[i].queryIdx;
-			int tid = matches[i].trainIdx;
+				pcl::Correspondences corr;
+				pcl::PointCloud<pcl::PointXYZRGBA> pcl_keypoints, pcl_keypoints_pre;
+				int j = 0;
+				for (size_t i = 0; i < 32; i++)
+				{
+					int sid = matches[i].queryIdx;
+					int tid = matches[i].trainIdx;
+		
+					int sind = int(keypoints_pre[sid].pt.y)*width + int(keypoints_pre[sid].pt.x);
+					int tind = int(keypoints[tid].pt.y)*width + int(keypoints[tid].pt.x);
+		
+					
+					if (pcl_isfinite(cloud_.points[tind].x) && pcl_isfinite(pre_cloud_.points[sind].x))
+					{
+						pcl_keypoints.push_back(cloud_.points[tind]);
+						pcl_keypoints_pre.push_back(pre_cloud_.points[sind]);
+		
+						pcl::Correspondence cori;
+						cori.index_query = j;
+						cori.index_match = j;
+						j++;
+						corr.push_back(cori);
+					}
+				}
+		
+				Eigen::Matrix4f transform;
+		
+				pcl::registration::TransformationEstimationSVD<pcl::PointXYZRGBA, pcl::PointXYZRGBA> est;
+		
+		
+				boost::posix_time::ptime t3(boost::posix_time::microsec_clock::local_time());
+				dt = t3 - t2;
+				std::cout << "[3]get correspondence in :" << dt.total_milliseconds() / 1000.0 << std::endl;
 
-			int sind = int(pre_keypoints[sid].pt.y)*width + int(pre_keypoints[sid].pt.x);
-			int tind = int(keypoints[tid].pt.y)*width + int(keypoints[tid].pt.x);
+				est.estimateRigidTransformation(pcl_keypoints, pcl_keypoints_pre, corr, transform);
 
-			
-			if (pcl_isfinite(cloud_.points[tind].x) && pcl_isfinite(pre_cloud_.points[sind].x))
-			{
-				pcl_keypoints.push_back(cloud_.points[tind]);
-				pcl_keypoints_pre.push_back(pre_cloud_.points[sind]);
+				boost::posix_time::ptime t4(boost::posix_time::microsec_clock::local_time());
+				dt = t4 - t3;
+				std::cout << "[4]estimate transfrom in: " << dt.total_milliseconds() / 1000.0 << std::endl;
 
-				pcl::Correspondence cori;
-				cori.index_query = j;
-				cori.index_match = j;
-				j++;
-				corr.push_back(cori);
-			}
-		}
+				pcl::transformPointCloud(cloud_, cloud_, transform);
 
-		Eigen::Matrix4f transform;
+				boost::posix_time::ptime t5(boost::posix_time::microsec_clock::local_time());
+				dt = t5 - t4;
 
-		pcl::registration::TransformationEstimationSVD<pcl::PointXYZRGBA, pcl::PointXYZRGBA> est;
-
-
-
-		est.estimateRigidTransformation(pcl_keypoints, pcl_keypoints_pre, corr, transform);
-
-		pcl::transformPointCloud(cloud_, cloud_, transform);
-		/*image_viewer_.showCorrespondences(pcl_keypoints_pre, pcl_keypoints, corr);
-		image_viewer_.spinOnce();
-*/
-		//world_ += cloud_;
-		/*pcl::ApproximateVoxelGrid<pcl::PointXYZRGBA> avg;
-		avg.setInputCloud(world_.makeShared());
-		avg.setLeafSize(0.05, 0.05, 0.05);
-		avg.filter(cloud_);*/
-		boost::posix_time::ptime t4(boost::posix_time::microsec_clock::local_time());
-		 dt = t4 - t3;
-		std::cout << "fusion a frame in: " << dt.total_milliseconds() / 1000.0 << std::endl; 
-
+				std::cout << "[5]transform cloud: " << dt.total_milliseconds() / 1000.0 << std::endl;
 		return true;
 	}
 	

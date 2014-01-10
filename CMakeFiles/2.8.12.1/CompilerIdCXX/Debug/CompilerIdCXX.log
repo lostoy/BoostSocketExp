@@ -1,4 +1,4 @@
-﻿Build started 2014/1/6 12:42:00.
+﻿Build started 2014/1/10 9:44:08.
      1>Project "D:\workspace\boost_socket\CMakeFiles\2.8.12.1\CompilerIdCXX\CompilerIdCXX.vcxproj" on node 2 (Build target(s)).
      1>InitializeBuildStatus:
          Creating "Debug\CompilerIdCXX.unsuccessfulbuild" because "AlwaysCreate" was specified.
@@ -19,4 +19,4 @@
 
 Build succeeded.
 
-Time Elapsed 00:00:00.23
+Time Elapsed 00:00:00.32

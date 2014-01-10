@@ -13,8 +13,9 @@ include_directories(${PCL_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
-add_executable(PointCloudSocket PointCloudSocket.cpp)
+add_executable(PointCloudSocket PointCloudSocket.cpp SocketServer.cpp SocketServer.hpp )
+add_library(gpu_utility SHARED gpu_utility.cpp gpu_utility.h)
 
-target_link_libraries( PointCloudSocket ${Boost_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS} )
+target_link_libraries( PointCloudSocket ${Boost_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS})
 
 
